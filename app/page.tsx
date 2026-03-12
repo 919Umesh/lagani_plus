@@ -1,65 +1,331 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import * as api from "@/lib/api";
+import type { MarketIndex, LiveTradingData, IPO, CompanyEvent } from "@/lib/types";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { PageLoader, ErrorState, EmptyState } from "@/components/ui/spinner";
+import { formatNPR, formatPercent, formatNumber, formatDate } from "@/lib/utils";
+import {
+  TrendingUp,
+  TrendingDown,
+  BarChart3,
+  Activity,
+  ArrowUpRight,
+  ArrowDownRight,
+  Landmark,
+  CalendarDays,
+  ChevronRight,
+} from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
+
+const COLORS = ["#10b981", "#059669", "#34d399", "#6ee7b7", "#a7f3d0", "#d1fae5", "#047857", "#065f46"];
+
+export default function HomePage() {
+  const [index, setIndex] = useState<MarketIndex | null>(null);
+  const [gainers, setGainers] = useState<LiveTradingData[]>([]);
+  const [losers, setLosers] = useState<LiveTradingData[]>([]);
+  const [active, setActive] = useState<LiveTradingData[]>([]);
+  const [turnover, setTurnover] = useState<LiveTradingData[]>([]);
+  const [ipos, setIPOs] = useState<IPO[]>([]);
+  const [events, setEvents] = useState<CompanyEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [idxRes, gRes, lRes, aRes, tRes, ipoRes, evtRes] = await Promise.all([
+          api.getMarketIndex(),
+          api.getTopGainers(5),
+          api.getTopLosers(5),
+          api.getMostActive(5),
+          api.getTopTurnover(5),
+          api.listIPOs(),
+          api.getUpcomingEvents(5),
+        ]);
+        setIndex(idxRes.data);
+        setGainers(gRes.data);
+        setLosers(lRes.data);
+        setActive(aRes.data);
+        setTurnover(tRes.data);
+        setIPOs(ipoRes.ipos?.filter((i) => i.status === "open" || i.status === "pending").slice(0, 4) ?? []);
+        setEvents(evtRes.events ?? []);
+      } catch {
+        setError("Failed to load market data");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  if (loading) return <PageLoader />;
+  if (error) return <ErrorState message={error} />;
+
+  const indexUp = (index?.change ?? 0) >= 0;
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="mx-auto max-w-7xl px-4 py-6 lg:px-6 space-y-6">
+      {/* Hero / Market Index */}
+      <div className="rounded-2xl border border-zinc-800 bg-gradient-to-br from-zinc-900 to-zinc-950 p-6 lg:p-8">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-sm font-medium text-zinc-500 uppercase tracking-wider">NEPSE Index</p>
+            <div className="mt-1 flex items-baseline gap-3">
+              <span className="text-4xl font-bold text-white">
+                {index && Number.isFinite(Number(index.index_value)) ? Number(index.index_value).toFixed(2) : "—"}
+              </span>
+              <span className={`flex items-center gap-1 text-lg font-semibold ${indexUp ? "text-emerald-400" : "text-red-400"}`}>
+                {indexUp ? <ArrowUpRight className="h-5 w-5" /> : <ArrowDownRight className="h-5 w-5" />}
+                {index && Number.isFinite(Number(index.change)) ? Number(index.change).toFixed(2) : "—"} ({formatPercent(Number(index?.change_percent))})
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-zinc-500">
+              Previous close: {index && Number.isFinite(Number(index.previous_close)) ? Number(index.previous_close).toFixed(2) : "—"}
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <MiniStat label="Total Turnover" value={formatNPR(Number(index?.total_turnover ?? 0))} />
+            <MiniStat label="Total Volume" value={formatNumber(Number(index?.total_volume ?? 0))} />
+            <MiniStat label="Advances" value={String(index?.advances ?? 0)} color="text-emerald-400" />
+            <MiniStat label="Declines" value={String(index?.declines ?? 0)} color="text-red-400" />
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </div>
+
+      {/* Quick action cards */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <QuickCard href="/market" icon={BarChart3} label="Market Overview" desc="Browse all companies" />
+        <QuickCard href="/ipo" icon={Landmark} label="IPO Center" desc="Apply for new IPOs" />
+        <QuickCard href="/market?tab=sectors" icon={Activity} label="Sector Analysis" desc="Performance by sector" />
+        <QuickCard href="/events" icon={CalendarDays} label="Events Calendar" desc="Upcoming dividends & AGMs" />
+      </div>
+
+      {/* Gainers and Losers */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-emerald-400" /> Top Gainers
+            </CardTitle>
+            <Link href="/market?tab=gainers">
+              <Button variant="ghost" size="sm">View All <ChevronRight className="ml-1 h-4 w-4" /></Button>
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {gainers.length === 0 ? (
+              <EmptyState message="No gainers data" />
+            ) : (
+              <div className="space-y-3">
+                {gainers.map((s) => (
+                  <Link key={s.company_id} href={`/companies/${s.company_id}`} className="flex items-center justify-between rounded-lg p-2 hover:bg-zinc-800/50 transition-colors">
+                    <div>
+                      <p className="font-medium text-gray-100">{s.symbol}</p>
+                      <p className="text-xs text-zinc-500">{s.company_name}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium text-gray-100">{formatNPR(Number(s.ltp))}</p>
+                      <p className="text-sm text-emerald-400">{formatPercent(Number(s.change_percent))}</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <TrendingDown className="h-5 w-5 text-red-400" /> Top Losers
+            </CardTitle>
+            <Link href="/market?tab=losers">
+              <Button variant="ghost" size="sm">View All <ChevronRight className="ml-1 h-4 w-4" /></Button>
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {losers.length === 0 ? (
+              <EmptyState message="No losers data" />
+            ) : (
+              <div className="space-y-3">
+                {losers.map((s) => (
+                  <Link key={s.company_id} href={`/companies/${s.company_id}`} className="flex items-center justify-between rounded-lg p-2 hover:bg-zinc-800/50 transition-colors">
+                    <div>
+                      <p className="font-medium text-gray-100">{s.symbol}</p>
+                      <p className="text-xs text-zinc-500">{s.company_name}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium text-gray-100">{formatNPR(Number(s.ltp))}</p>
+                      <p className="text-sm text-red-400">{formatPercent(Number(s.change_percent))}</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Most Active + Top Turnover charts */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-emerald-400" /> Most Active (by Volume)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {active.length === 0 ? (
+              <EmptyState message="No active data" />
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={active.map((a) => ({ name: a.symbol, volume: Number(a.volume) }))}>
+                  <XAxis dataKey="name" tick={{ fill: "#71717a", fontSize: 11 }} />
+                  <YAxis tick={{ fill: "#71717a", fontSize: 11 }} />
+                  <Tooltip contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8 }} labelStyle={{ color: "#f9fafb" }} />
+                  <Bar dataKey="volume" fill="#10b981" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-emerald-400" /> Top Turnover
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {turnover.length === 0 ? (
+              <EmptyState message="No turnover data" />
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie
+                    data={turnover.map((t) => ({ name: t.symbol, value: Number(t.turnover) }))}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={90}
+                    paddingAngle={3}
+                    dataKey="value"
+                    label={({ name }) => name}
+                  >
+                    {turnover.map((_, i) => (
+                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* IPOs and Events */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Landmark className="h-5 w-5 text-emerald-400" /> Open/Upcoming IPOs
+            </CardTitle>
+            <Link href="/ipo">
+              <Button variant="ghost" size="sm">View All <ChevronRight className="ml-1 h-4 w-4" /></Button>
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {ipos.length === 0 ? (
+              <EmptyState message="No open IPOs right now" />
+            ) : (
+              <div className="space-y-3">
+                {ipos.map((ipo) => (
+                  <Link key={ipo.id} href={`/ipo/${ipo.id}`} className="flex items-center justify-between rounded-lg border border-zinc-800 p-3 hover:bg-zinc-800/50 transition-colors">
+                    <div>
+                      <p className="font-medium text-gray-100">IPO #{ipo.id.slice(0, 8)}</p>
+                      <p className="text-xs text-zinc-500">
+                        {formatNPR(ipo.price_per_share)} per share · {formatNumber(ipo.total_shares)} shares
+                      </p>
+                    </div>
+                    <Badge variant={ipo.status === "open" ? "success" : "warning"}>
+                      {ipo.status}
+                    </Badge>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <CalendarDays className="h-5 w-5 text-emerald-400" /> Upcoming Events
+            </CardTitle>
+            <Link href="/events">
+              <Button variant="ghost" size="sm">View All <ChevronRight className="ml-1 h-4 w-4" /></Button>
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {events.length === 0 ? (
+              <EmptyState message="No upcoming events" />
+            ) : (
+              <div className="space-y-3">
+                {events.map((evt) => (
+                  <div key={evt.id} className="flex items-center justify-between rounded-lg border border-zinc-800 p-3">
+                    <div>
+                      <p className="font-medium text-gray-100">{evt.title}</p>
+                      <p className="text-xs text-zinc-500">{formatDate(evt.event_date)}</p>
+                    </div>
+                    <Badge variant="outline">{evt.event_type.replace(/_/g, " ")}</Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
+  );
+}
+
+function MiniStat({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3">
+      <p className="text-xs text-zinc-500">{label}</p>
+      <p className={`mt-1 text-lg font-semibold ${color ?? "text-gray-100"}`}>{value}</p>
+    </div>
+  );
+}
+
+function QuickCard({ href, icon: Icon, label, desc }: { href: string; icon: React.ElementType; label: string; desc: string }) {
+  return (
+    <Link href={href}>
+      <Card className="h-full cursor-pointer transition-colors hover:border-emerald-600/40 hover:bg-zinc-800/30">
+        <CardContent className="flex items-center gap-3 p-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-600/10">
+            <Icon className="h-5 w-5 text-emerald-400" />
+          </div>
+          <div>
+            <p className="font-medium text-gray-100">{label}</p>
+            <p className="text-xs text-zinc-500">{desc}</p>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
   );
 }
