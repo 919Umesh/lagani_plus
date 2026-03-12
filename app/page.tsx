@@ -189,16 +189,46 @@ export default function HomePage() {
           </CardHeader>
           <CardContent>
             {active.length === 0 ? (
-              <EmptyState message="No active data" />
+              <EmptyState message="No market activity recorded" />
             ) : (
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={active.map((a) => ({ name: a.symbol, volume: Number(a.volume) }))}>
-                  <XAxis dataKey="name" tick={{ fill: "#71717a", fontSize: 11 }} />
-                  <YAxis tick={{ fill: "#71717a", fontSize: 11 }} />
-                  <Tooltip contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8 }} labelStyle={{ color: "#f9fafb" }} />
-                  <Bar dataKey="volume" fill="#10b981" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="flex flex-col gap-4">
+                {/* List View - Always clean and visible */}
+                <div className="space-y-2">
+                  {active.map((a) => (
+                    <div key={a.company_id} className="flex items-center justify-between rounded-lg bg-zinc-900/40 p-3 border border-zinc-800/50 hover:border-emerald-500/30 transition-colors">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-emerald-400">{a.symbol}</span>
+                        <span className="text-[10px] text-zinc-500 uppercase tracking-tight">{a.sector}</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span className="text-[10px] text-zinc-500 font-medium uppercase">Vol:</span>
+                          <span className="text-sm font-semibold text-zinc-200">{formatNumber(Number(a.volume))}</span>
+                        </div>
+                        <p className="text-[10px] text-zinc-500">LTP: {formatNPR(Number(a.ltp))}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Visual Chart - Only show if there's actual volume to plot */}
+                {active.some(a => Number(a.volume) > 0) && (
+                  <div className="pt-2 border-t border-zinc-900">
+                    <ResponsiveContainer width="100%" height={140}>
+                      <BarChart data={active.map((a) => ({ name: a.symbol, volume: Number(a.volume) || 0 }))}>
+                        <XAxis dataKey="name" tick={{ fill: "#71717a", fontSize: 10 }} axisLine={false} tickLine={false} />
+                        <YAxis hide />
+                        <Tooltip 
+                          cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                          contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8 }} 
+                          labelStyle={{ color: "#f9fafb" }} 
+                        />
+                        <Bar dataKey="volume" fill="#10b981" radius={[4, 4, 0, 0]} barSize={30} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </div>
             )}
           </CardContent>
         </Card>
@@ -211,27 +241,48 @@ export default function HomePage() {
           </CardHeader>
           <CardContent>
             {turnover.length === 0 ? (
-              <EmptyState message="No turnover data" />
+              <EmptyState message="No turnover data available" />
             ) : (
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={turnover.map((t) => ({ name: t.symbol, value: Number(t.turnover) }))}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={90}
-                    paddingAngle={3}
-                    dataKey="value"
-                    label={({ name }) => name}
-                  >
-                    {turnover.map((_, i) => (
-                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8 }} />
-                </PieChart>
-              </ResponsiveContainer>
+              <div className="flex flex-col gap-4">
+                {/* Visual Chart - Only show if there's actual positive turnover to plot */}
+                {turnover.some(t => Number(t.turnover) > 0) && (
+                  <div className="pb-4 border-b border-zinc-900/50">
+                    <ResponsiveContainer width="100%" height={200}>
+                      <PieChart>
+                        <Pie
+                          data={turnover.filter(t => Number(t.turnover) > 0).map((t) => ({ name: t.symbol, value: Number(t.turnover) || 0 }))}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={80}
+                          paddingAngle={5}
+                          dataKey="value"
+                          labelLine={false}
+                        >
+                          {turnover.map((_, i) => (
+                            <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8 }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+                
+                {/* Data List - Always clean and visible */}
+                <div className="space-y-1">
+                  {turnover.map((t) => (
+                    <div key={t.company_id} className="group flex items-center justify-between rounded-md p-2 hover:bg-zinc-800/30 transition-colors">
+                       <div className="flex items-center gap-2">
+                         <div className="h-2 w-2 rounded-full" style={{ backgroundColor: COLORS[turnover.indexOf(t) % COLORS.length] }} />
+                         <span className="font-bold text-sm text-emerald-400">{t.symbol}</span>
+                       </div>
+                       <span className="text-[11px] text-zinc-500 hidden md:block">{t.company_name}</span>
+                       <span className="font-mono text-xs text-zinc-300 font-medium">{formatNPR(Number(t.turnover))}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
