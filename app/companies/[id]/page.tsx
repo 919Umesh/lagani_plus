@@ -15,6 +15,7 @@ import { Table, TableBody, TableRow, TableHead, TableCell, TableHeader } from "@
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { PageLoader, ErrorState, EmptyState, Spinner } from "@/components/ui/spinner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { CandleChart } from "@/components/candle-chart";
 import { formatNPR, formatPercent, formatNumber, formatDate, formatDateTime, changeColor, abbreviateNumber } from "@/lib/utils";
 import {
   ArrowUpRight,
@@ -58,7 +59,6 @@ export default function CompanyDetailPage() {
   const [trades, setTrades] = useState<CompanyTransaction[]>([]);
   const [prediction, setPrediction] = useState<PricePrediction | null>(null);
   const [events, setEvents] = useState<CompanyEvent[]>([]);
-  const [timeframe, setTimeframe] = useState("1D");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -96,7 +96,7 @@ export default function CompanyDetailPage() {
         if (pRes) setPrediction(pRes.data);
         setEvents(evRes.events ?? []);
         if (cRes.data?.symbol) {
-          const candleRes = await api.getCandlestick(cRes.data.symbol, timeframe);
+          const candleRes = await api.getCandlestick(cRes.data.symbol);
           setCandles(candleRes.data ?? []);
         }
       } catch (err) {
@@ -106,7 +106,7 @@ export default function CompanyDetailPage() {
         setLoading(false);
       }
     })();
-  }, [id, timeframe]);
+  }, [id]);
 
   const handlePlaceOrder = async () => {
     if (!token || !id) return;
@@ -237,39 +237,15 @@ export default function CompanyDetailPage() {
         <div className="lg:col-span-2 space-y-4">
           <Card>
             <CardHeader className="flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-emerald-400" /> Price Chart</CardTitle>
-              <div className="flex gap-1">
-                {["1m", "5m", "15m", "1h", "1D"].map((tf) => (
-                  <Button
-                    key={tf}
-                    variant={timeframe === tf ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setTimeframe(tf)}
-                  >
-                    {tf}
-                  </Button>
-                ))}
-              </div>
+              <CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-emerald-400" /> Price Chart (1D)</CardTitle>
             </CardHeader>
             <CardContent>
               {candles.length === 0 ? (
                 <EmptyState message="No chart data available" />
               ) : (
-                <ResponsiveContainer width="100%" height={320}>
-                  <AreaChart data={candles}>
-                    <defs>
-                      <linearGradient id="colorClose" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-                    <XAxis dataKey="timestamp" tick={{ fill: "#71717a", fontSize: 10 }} tickFormatter={(v) => new Date(v).toLocaleDateString("en-US", { month: "short", day: "numeric" })} />
-                    <YAxis domain={["auto", "auto"]} tick={{ fill: "#71717a", fontSize: 11 }} />
-                    <Tooltip contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8 }} labelStyle={{ color: "#f9fafb" }} />
-                    <Area type="monotone" dataKey="close" stroke="#10b981" fillOpacity={1} fill="url(#colorClose)" strokeWidth={2} />
-                  </AreaChart>
-                </ResponsiveContainer>
+                <div className="h-[400px]">
+                  <CandleChart data={candles} />
+                </div>
               )}
               <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
                 <StatCard label="Open" value={formatNPR(Number(company.open_price || company.current_price))} />

@@ -241,9 +241,9 @@ export const getLiveTrading = () =>
 export const getMarketIndex = () =>
   request<{ data: MarketIndex }>("/market/index");
 
-export const getCandlestick = (symbol: string, timeframe = "1D", days = 90) =>
+export const getCandlestick = (symbol: string, days = 365) =>
   request<{ data: CandlestickData[]; symbol: string; timeframe: string; count: number }>(
-    `/market/candlestick?symbol=${symbol}&timeframe=${timeframe}&days=${days}`,
+    `/market/candlestick?symbol=${symbol}&days=${days}`,
   );
 
 export const getTopGainers = (limit = 10) =>

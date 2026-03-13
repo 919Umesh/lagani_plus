@@ -156,11 +156,12 @@ export default function AdminDashboard() {
                   fontSize={12} 
                   tickLine={false} 
                   axisLine={false}
-                  tickFormatter={(val) => `${val}`}
+                  tickFormatter={(val) => `${Number(val)}`}
                 />
                 <Tooltip 
                   contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: "8px" }}
                   itemStyle={{ color: "#10b981" }}
+                  formatter={(value: any) => [Number(value).toFixed(2), "Value"]}
                 />
                 <Area 
                   type="monotone" 
